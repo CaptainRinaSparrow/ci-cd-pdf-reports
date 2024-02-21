@@ -10,20 +10,25 @@ dotenv_path = Path('build.env').resolve()
 load_dotenv(dotenv_path=dotenv_path, override=True)
 access_token = getenv('ACCESS_TOKEN')
 ci_project_id = getenv('CI_PROJECT_ID')
+ci_server_host = getenv('CI_SERVER_HOST')
+image_path = getenv('IMAGE_PATH')
+image_url = getenv('IMAGE_URL')
+log_file_name = getenv('LOG_FILE_NAME')
+target = getenv('TARGET')
 time_zone = getenv('TIME_ZONE')
 tz = pytz.timezone(time_zone)
 date_time = datetime.now(tz).strftime('%Y.%m.%d %H:%M %Z (UTC%z)')
 
 
 def main():
-    response = send_request(url = f'https://gitlab.com/api/v4/projects/{ci_project_id}/pipelines/latest')
+    response = send_request(url = f'https://{ci_server_host}/api/v4/projects/{ci_project_id}/pipelines/latest')
     status, pipeline_id, source = get_pipeline_parameters(response)
     if status:
-        response = send_request(url = f'https://gitlab.com/api/v4/projects/{ci_project_id}/pipelines/{pipeline_id}/jobs')
+        response = send_request(url = f'https://{ci_server_host}/api/v4/projects/{ci_project_id}/pipelines/{pipeline_id}/jobs')
         job_id = get_job_parameters(response)
-        response = send_request(url = f'https://gitlab.com/api/v4/projects/{ci_project_id}/jobs/{job_id}/artifacts/log.log')
+        response = send_request(url = f'https://{ci_server_host}/api/v4/projects/{ci_project_id}/jobs/{job_id}/artifacts/{log_file_name}')
         logs = get_logs(response)
-        generate_deployment_report(source, 'gitlabci.cs50p', logs, date_time)
+        generate_deployment_report(source, target, logs, date_time)
     else:
         print('Please check your latest deployment!')
 
@@ -85,7 +90,7 @@ def get_logs(response) -> str:
 class FLTReport(FPDF):
     def __init__(self, source, target, date_time=None):
         super().__init__(orientation='L')
-        self.logo_path = Path(__file__).resolve().parent / 'cs50p.png'
+        self.logo_path = Path(__file__).resolve().parent / f'{image_path}'
         self.source = source
         self.target = target
         self.date_time = date_time
@@ -95,7 +100,7 @@ class FLTReport(FPDF):
         self.add_font('DejaVu', 'B', 'DejaVuSansCondensed-Bold.ttf')
         self.set_font('DejaVu', '', 10)
 
-        self.image(self.logo_path, 10, 5, 80, 0, '', 'https://cs50.harvard.edu/python/2022/')
+        self.image(self.logo_path, 10, 5, 80, 0, '', f'{image_url}')
         info_str = f"Source: {self.source}\nTarget: {self.target}\nTime: {self.date_time}"
         self.set_y(40)
         self.multi_cell(75, 5, info_str)
